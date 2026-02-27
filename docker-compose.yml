@@ -1,0 +1,100 @@
+version: "3"
+
+networks:
+  gitea:
+    external: true
+
+services:
+  server:
+    image: docker.gitea.com/gitea:${GITEA_IMAGE_TAG}
+    container_name: gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=${DB_TYPE}
+      - GITEA__database__HOST=${DB_HOST}
+      - GITEA__database__NAME=${DB_NAME}
+      - GITEA__database__USER=${DB_USER}
+      - GITEA__database__PASSWD=${DB_PASSWD}
+      - GITEA__security__INSTALL_LOCK=true
+      - GITEA__service__DISABLE_REGISTRATION=true
+      - GITEA__service__REQUIRE_SIGNIN_VIEW=true
+      - GITEA__ui__SHOW_USER_EMAIL=false
+    restart: always
+    networks:
+      - gitea
+    volumes:
+      - ./gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "${GITEA_HTTP_PORT}:3000"
+      - "${GITEA_SSH_PORT}:22"
+    depends_on:
+      - db
+
+  configure:
+    image: docker.gitea.com/gitea:${GITEA_IMAGE_TAG}
+    container_name: gitea_auto_config
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=${DB_TYPE}
+      - GITEA__database__HOST=${DB_HOST}
+      - GITEA__database__NAME=${DB_NAME}
+      - GITEA__database__USER=${DB_USER}
+      - GITEA__database__PASSWD=${DB_PASSWD}
+      - GITEA_ADMIN_USER=${GITEA_ADMIN_USER}
+      - GITEA_ADMIN_PASSWORD=${GITEA_ADMIN_PASSWORD}
+      - GITEA_ADMIN_EMAIL=${GITEA_ADMIN_EMAIL}
+    # Removed the inline command and mounted the external script to avoid YAML escaping problems
+    volumes:
+      - ./gitea:/data
+      - ./shared:/shared
+      - ./setup_gitea.sh:/setup.sh
+    entrypoint: ["/bin/bash", "/setup.sh"]
+    networks:
+      - gitea
+    depends_on:
+      - server
+      - db
+      
+    # For this to work, we need curl and bash which come in the gitea image.
+    # The root user executes this.
+    
+  db:
+    image: docker.io/library/postgres:${POSTGRES_IMAGE_TAG}
+    restart: always
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWD}
+    networks:
+      - gitea
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+
+  runner:
+    image: docker.io/gitea/act_runner:${RUNNER_IMAGE_TAG}
+    restart: always
+    environment:
+      CONFIG_FILE: "/config.yml"
+      GITEA_INSTANCE_URL: "http://gitea:3000/"
+      GITEA_RUNNER_NAME: "${RUNNER_NAME}"
+    entrypoint: >
+      bash -c '
+      while [ ! -f /shared/runner_token ]; do echo "Waiting for token..."; sleep 5; done;
+      export GITEA_RUNNER_REGISTRATION_TOKEN=$$(cat /shared/runner_token);
+      /sbin/tini -- /usr/local/bin/run.sh
+      '
+    depends_on:
+      - server
+      - db
+      - configure
+    networks:
+      - gitea
+    volumes:
+      - ./runner-config.yml:/config.yml
+      - ./runner:/data
+      - ./shared:/shared
+      - /var/run/docker.sock:/var/run/docker.sock
