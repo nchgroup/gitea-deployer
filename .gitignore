@@ -1,0 +1,5 @@
+gitea/
+postgres/
+runners/
+shared/
+.env
