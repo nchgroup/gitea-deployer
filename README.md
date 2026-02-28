@@ -1,5 +1,5 @@
 # gitea-deployer
-Fast as Fuck Gitea deployment and act_runner with Docker Compose.
+Fast as Fuck Gitea and act_runner deployment with Docker Compose.
 
 # First run
 
