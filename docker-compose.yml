@@ -47,7 +47,6 @@ services:
       - GITEA_ADMIN_USER=${GITEA_ADMIN_USER}
       - GITEA_ADMIN_PASSWORD=${GITEA_ADMIN_PASSWORD}
       - GITEA_ADMIN_EMAIL=${GITEA_ADMIN_EMAIL}
-    # Removed the inline command and mounted the external script to avoid YAML escaping problems
     volumes:
       - ./gitea:/data
       - ./shared:/shared
@@ -58,10 +57,7 @@ services:
     depends_on:
       - server
       - db
-      
-    # For this to work, we need curl and bash which come in the gitea image.
-    # The root user executes this.
-    
+
   db:
     image: docker.io/library/postgres:${POSTGRES_IMAGE_TAG}
     restart: always
