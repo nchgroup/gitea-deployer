@@ -20,6 +20,7 @@ services:
       - GITEA__service__DISABLE_REGISTRATION=true
       - GITEA__service__REQUIRE_SIGNIN_VIEW=true
       - GITEA__ui__SHOW_USER_EMAIL=false
+      - GITEA__actions__ENABLED=true
     restart: always
     networks:
       - gitea
@@ -47,6 +48,7 @@ services:
       - GITEA_ADMIN_USER=${GITEA_ADMIN_USER}
       - GITEA_ADMIN_PASSWORD=${GITEA_ADMIN_PASSWORD}
       - GITEA_ADMIN_EMAIL=${GITEA_ADMIN_EMAIL}
+      - GITEA__actions__ENABLED=true
     volumes:
       - ./gitea:/data
       - ./shared:/shared
@@ -81,12 +83,16 @@ services:
       bash -c '
       while [ ! -f /shared/runner_token ]; do echo "Waiting for token..."; sleep 5; done;
       export GITEA_RUNNER_REGISTRATION_TOKEN=$$(cat /shared/runner_token);
+      rm -f /shared/runner_token;
       /sbin/tini -- /usr/local/bin/run.sh
       '
     depends_on:
-      - server
-      - db
-      - configure
+      server:
+        condition: service_started
+      db:
+        condition: service_started
+      configure:
+        condition: service_completed_successfully
     networks:
       - gitea
     volumes:
